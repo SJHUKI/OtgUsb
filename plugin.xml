@@ -1,0 +1,19 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin id="sj.li.usb" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+    <name>OtgUsb</name>
+    <js-module name="OtgUsb" src="www/OtgUsb.js">
+        <clobbers target="cordova.plugins.OtgUsb" />
+    </js-module>
+    <platform name="android">
+        <config-file parent="/*" target="res/xml/config.xml">
+            <feature name="OtgUsb">
+                <param name="android-package" value="sj.li.usb.OtgUsb" />
+            </feature>
+        </config-file>
+        <config-file parent="/*" target="AndroidManifest.xml">
+            <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+            <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+        </config-file><source-file src="src/android/OtgUsb.java" target-dir="src/sj/li/usb/OtgUsb" />
+    </platform>
+</plugin>

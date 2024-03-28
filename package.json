@@ -1,0 +1,17 @@
+{
+  "name": "OtgUsb",
+  "version": "1.0.0",
+  "description": "",
+  "cordova": {
+    "id": "sj.li.usb",
+    "platforms": [
+      "android"
+    ]
+  },
+  "keywords": [
+    "ecosystem:cordova",
+    "cordova-android"
+  ],
+  "author": "li",
+  "license": "ISC"
+}
