@@ -17,6 +17,15 @@ import java.io.InputStreamReader;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
+import java.util.Enumeration;
+
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+
 import android.os.Build;
 import android.provider.Settings;
 import android.widget.Toast;
@@ -34,6 +43,7 @@ import android.app.Activity;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
+
 
 /**
  * This class echoes a string called from JavaScript.
@@ -131,46 +141,78 @@ public class OtgUsb extends CordovaPlugin {
                     File sourceFile = new File(sourcePath);
                     File targetFile = new File(targetDirectory, sourceFile.getName());
 
-                    try (FileInputStream inStream = new FileInputStream(sourceFile);
-                         FileOutputStream outStream = new FileOutputStream(targetFile)) {
-
-                        byte[] buffer = new byte[1024];
-                        int read;
-
-                        while ((read = inStream.read(buffer)) != -1) {
-                            outStream.write(buffer, 0, read);
-
-                            copiedBytes += read; // 更新已复制的字节数
-
-                            int progress = (int) Math.floor((double) copiedBytes / totalBytesToCopy * 100);
-
-                            PluginResult result = new PluginResult(PluginResult.Status.OK, progress);
+                    if (sourceFile.getName().toLowerCase().endsWith(".zip")) {
+                        try (ZipFile zipFile = new ZipFile(sourceFile)) {
+                            Enumeration<? extends ZipEntry> entries = zipFile.entries();
+                            // 更新进度信息
+                            PluginResult result = new PluginResult(PluginResult.Status.OK, "ZIP");
                             result.setKeepCallback(true); // 保持回调以继续发送进度
 
                             callbackContext.sendPluginResult(result);
+                            while (entries.hasMoreElements()) {
+                                ZipEntry entry = entries.nextElement();
+                                Path targetFilePath = Paths.get(targetDirectory, entry.getName());
+
+                                if (entry.isDirectory()) {
+                                    Files.createDirectories(targetFilePath);
+                                } else {
+                                    Files.copy(zipFile.getInputStream(entry), targetFilePath, StandardCopyOption.REPLACE_EXISTING);
+                                }
+                            }
+
+                            copiedBytes += sourceFile.length(); // 更新已复制的字节数
+
+                            if (deleteIfExists) {
+                                // 删除源文件
+                                sourceFile.delete();
+                            }
+                        } catch (IOException e) {
+                            String errorMessage = e.getMessage();
+                            PluginResult result = new PluginResult(PluginResult.Status.ERROR, errorMessage);
+                            result.setKeepCallback(false); // 关闭回调
+                            callbackContext.sendPluginResult(result);
+                        }
+                    } else {
+                        try (FileInputStream inStream = new FileInputStream(sourceFile);
+                             FileOutputStream outStream = new FileOutputStream(targetFile)) {
+
+                            byte[] buffer = new byte[1024];
+                            int read;
+
+                            while ((read = inStream.read(buffer)) != -1) {
+                                outStream.write(buffer, 0, read);
+
+                                copiedBytes += read; // 更新已复制的字节数
+
+                                int progress = (int) Math.floor((double) copiedBytes / totalBytesToCopy * 100);
+
+                                PluginResult result = new PluginResult(PluginResult.Status.OK, progress);
+                                result.setKeepCallback(true); // 保持回调以继续发送进度
+
+                                callbackContext.sendPluginResult(result);
+                            }
+
+                        // 强制将缓冲区内容刷新到磁盘
+                        outStream.flush();
+                        // 同步文件描述符以确保所有数据都已写入物理媒介
+                        outStream.getFD().sync();
+
+                        if (deleteIfExists) {
+                            // 删除源文件
+                            sourceFile.delete();
                         }
 
-                    // 强制将缓冲区内容刷新到磁盘
-                    outStream.flush();
-                    // 同步文件描述符以确保所有数据都已写入物理媒介
-                    outStream.getFD().sync();
-
-                    if (deleteIfExists) {
-                        // 删除源文件
-                        sourceFile.delete();
-                    }
-
-                        // 如果需要，可在复制每个文件成功后添加相应逻辑
-                    } catch (IOException e) {
-                        String errorMessage = e.getMessage();
-                        PluginResult result = new PluginResult(PluginResult.Status.OK, errorMessage);
-                        result.setKeepCallback(false); // 关闭回调
-                        callbackContext.sendPluginResult(result);
-                    } finally {
-                        totalBytesToCopy = 0;
-                        copiedBytes = 0;
+                            // 如果需要，可在复制每个文件成功后添加相应逻辑
+                        } catch (IOException e) {
+                            String errorMessage = e.getMessage();
+                            PluginResult result = new PluginResult(PluginResult.Status.OK, errorMessage);
+                            result.setKeepCallback(false); // 关闭回调
+                            callbackContext.sendPluginResult(result);
+                        }
                     }
                 }
+                totalBytesToCopy = 0;
+                copiedBytes = 0;
                 // 下载完成后发送完成消息
                 PluginResult result = new PluginResult(PluginResult.Status.OK, "OK");
                 result.setKeepCallback(false); // 关闭回调
@@ -186,10 +228,10 @@ public class OtgUsb extends CordovaPlugin {
             Context context = cordova.getActivity();
 
             if (Environment.isExternalStorageManager()) {
-                Toast.makeText(context, "三江助手已经获得U您的盘管理权限", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, "已经获得U盘管理权限！", Toast.LENGTH_LONG).show();
                 callbackContext.success("HAVE POWER");
             } else {
-                Toast.makeText(context, "请打开权限，否则三江助手无权使用您的U盘！", Toast.LENGTH_LONG).show();
+                Toast.makeText(context, "请打开权限，否则APP无权使用U盘！", Toast.LENGTH_LONG).show();
                 Intent intent = new Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION);
                 intent.setData(Uri.parse("package:" + cordova.getActivity().getPackageName()));
                 permissionCallback = callbackContext;
@@ -225,3 +267,4 @@ public class OtgUsb extends CordovaPlugin {
         }
     }
 }
+
