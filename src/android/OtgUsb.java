@@ -17,6 +17,11 @@ import java.io.InputStreamReader;
 import java.io.FileNotFoundException;
 import java.io.InputStream;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
+import java.io.OutputStream;
+import java.util.zip.ZipInputStream;
+
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.Enumeration;
@@ -24,7 +29,6 @@ import java.util.Enumeration;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 
 import android.os.Build;
 import android.provider.Settings;
@@ -44,6 +48,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.List;
 
+import android.util.Log;
+
 
 /**
  * This class echoes a string called from JavaScript.
@@ -53,6 +59,7 @@ public class OtgUsb extends CordovaPlugin {
     private CallbackContext permissionCallback;
     private long totalBytesToCopy = 0;
     private long copiedBytes = 0;
+    private static final String TAG = "OtgUsb";
 
     @Override
     public boolean execute(String action, JSONArray args, final CallbackContext callbackContext) throws JSONException {
@@ -142,21 +149,37 @@ public class OtgUsb extends CordovaPlugin {
                     File targetFile = new File(targetDirectory, sourceFile.getName());
 
                     if (sourceFile.getName().toLowerCase().endsWith(".zip")) {
-                        try (ZipFile zipFile = new ZipFile(sourceFile)) {
-                            Enumeration<? extends ZipEntry> entries = zipFile.entries();
-                            // 更新进度信息
+                        try (InputStream inputStream = new BufferedInputStream(new FileInputStream(sourceFile));
+                             ZipInputStream zipInputStream = new ZipInputStream(inputStream)) {
+
                             PluginResult result = new PluginResult(PluginResult.Status.OK, "ZIP");
                             result.setKeepCallback(true); // 保持回调以继续发送进度
-
                             callbackContext.sendPluginResult(result);
-                            while (entries.hasMoreElements()) {
-                                ZipEntry entry = entries.nextElement();
+
+                            ZipEntry entry;
+                            while ((entry = zipInputStream.getNextEntry()) != null) {
                                 Path targetFilePath = Paths.get(targetDirectory, entry.getName());
 
                                 if (entry.isDirectory()) {
                                     Files.createDirectories(targetFilePath);
                                 } else {
-                                    Files.copy(zipFile.getInputStream(entry), targetFilePath, StandardCopyOption.REPLACE_EXISTING);
+                                    try {
+                                        FileOutputStream outputStream = new FileOutputStream(targetFilePath.toFile());
+                                        byte[] buffer = new byte[1024]; // 建议使用适当大小的缓冲区
+                                        int bytesRead;
+
+                                        while ((bytesRead = zipInputStream.read(buffer)) != -1) {
+                                            outputStream.write(buffer, 0, bytesRead);
+                                        }
+
+                                        // 强制将缓冲区中的数据写入并同步到磁盘
+                                        outputStream.flush();
+                                        outputStream.getFD().sync(); // 使用FileDescriptor.sync()方法确保数据同步到磁盘
+                                    } catch (IOException ioException) {
+                                        String errorMessage = "Failed to extract file: " + entry.getName();
+                                        Log.e(TAG, "Failed to extract file: " + entry.getName(), ioException);
+                                        throw new IOException(errorMessage, ioException);
+                                    }
                                 }
                             }
 
@@ -167,8 +190,9 @@ public class OtgUsb extends CordovaPlugin {
                                 sourceFile.delete();
                             }
                         } catch (IOException e) {
+                            Log.e(TAG, "1 moveToUSB Finally ERR ", e);
                             String errorMessage = e.getMessage();
-                            PluginResult result = new PluginResult(PluginResult.Status.ERROR, errorMessage);
+                            PluginResult result = new PluginResult(PluginResult.Status.OK, "Failed");
                             result.setKeepCallback(false); // 关闭回调
                             callbackContext.sendPluginResult(result);
                         }
@@ -192,20 +216,21 @@ public class OtgUsb extends CordovaPlugin {
                                 callbackContext.sendPluginResult(result);
                             }
 
-                        // 强制将缓冲区内容刷新到磁盘
-                        outStream.flush();
-                        // 同步文件描述符以确保所有数据都已写入物理媒介
-                        outStream.getFD().sync();
+                            // 强制将缓冲区内容刷新到磁盘
+                            outStream.flush();
+                            // 同步文件描述符以确保所有数据都已写入物理媒介
+                            outStream.getFD().sync();
 
-                        if (deleteIfExists) {
-                            // 删除源文件
-                            sourceFile.delete();
-                        }
+                            if (deleteIfExists) {
+                                // 删除源文件
+                                sourceFile.delete();
+                            }
 
                             // 如果需要，可在复制每个文件成功后添加相应逻辑
                         } catch (IOException e) {
+                            Log.e(TAG, "2 moveToUSB Finally ERR ", e);
                             String errorMessage = e.getMessage();
-                            PluginResult result = new PluginResult(PluginResult.Status.OK, errorMessage);
+                            PluginResult result = new PluginResult(PluginResult.Status.OK, "Failed");
                             result.setKeepCallback(false); // 关闭回调
                             callbackContext.sendPluginResult(result);
                         }
