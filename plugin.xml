@@ -1,7 +1,9 @@
 <?xml version='1.0' encoding='utf-8'?>
-<plugin id="sj.li.usb" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
+<plugin id="OtgUsb" version="1.0.0" xmlns="http://apache.org/cordova/ns/plugins/1.0" xmlns:android="http://schemas.android.com/apk/res/android">
     <name>OtgUsb</name>
+    <!--js-module指定进行通信的js接口 src就是接口文件的路径-->
     <js-module name="OtgUsb" src="www/OtgUsb.js">
+        <!--   clobbers是前端调用时的名字，可以随意更改     -->
         <clobbers target="cordova.plugins.OtgUsb" />
     </js-module>
     <platform name="android">
@@ -13,6 +15,7 @@
         <config-file parent="/*" target="AndroidManifest.xml">
             <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
             <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+        <!-- 第一个路径是java文件在插件中的目录，第二个路径是java文件在platform中的目录 -->
         </config-file><source-file src="src/android/OtgUsb.java" target-dir="src/sj/li/usb/OtgUsb" />
     </platform>
 </plugin>

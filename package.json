@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "",
   "cordova": {
-    "id": "sj.li.usb",
+    "id": "OtgUsb",
     "platforms": [
       "android"
     ]
