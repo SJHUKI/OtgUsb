@@ -12,3 +12,4 @@ exports.getPermission = function (success, error) {
     exec(success, error, 'OtgUsb', 'getPermission');
 };
 
+// 测试修改
